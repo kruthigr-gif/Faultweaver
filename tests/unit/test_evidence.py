@@ -54,5 +54,5 @@ def test_collector_queries_real_metric_labels_and_scores_evidence():
     assert evidence[0]["score"] == 4
     assert evidence[1]["score"] == 5
     assert evidence[2]["score"] == 3
-    assert "job=\"inventory-service\",handler=\"/stock\"" in telemetry.prometheus_queries[0]
+    assert 'job="inventory-service",handler=~"/(stock|reserve)"' in telemetry.prometheus_queries[0]
     assert 'severity_text=~"ERROR|FATAL"' in telemetry.loki_queries[0]

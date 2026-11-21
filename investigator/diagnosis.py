@@ -10,6 +10,8 @@ class Diagnoser:
         evidence_ids: Dict[str, List[str]] = {}
 
         for item in evidence:
+            if not item.get("available", True):
+                continue
             service = item.get("service")
             if not service:
                 continue

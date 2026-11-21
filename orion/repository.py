@@ -13,10 +13,14 @@ class PostgresRepository:
         self.pool = pool
 
     async def initialize(self):
-        migration = Path(__file__).with_name("migrations") / "001_initial.sql"
-        sql = migration.read_text(encoding="utf-8")
+        migrations = sorted(
+            (Path(__file__).with_name("migrations")).glob("*.sql")
+        )
         async with self.pool.acquire() as connection:
-            await connection.execute(sql)
+            for migration in migrations:
+                await connection.execute(
+                    migration.read_text(encoding="utf-8")
+                )
 
     async def ping(self) -> bool:
         return await self.pool.fetchval("SELECT 1") == 1
@@ -139,6 +143,20 @@ class PostgresRepository:
                         }
                     ),
                 )
+                state = {
+                    "approval_required": "pending_approval",
+                    "blocked": "blocked",
+                    "no_action": "no_action",
+                }[stored.policy.decision]
+                await connection.execute(
+                    """
+                    INSERT INTO orion_plan_state(plan_id, status)
+                    VALUES($1, $2)
+                    ON CONFLICT(plan_id) DO NOTHING
+                    """,
+                    stored.plan_id,
+                    state,
+                )
         return stored
 
     async def get_plan(self, plan_id: str) -> ActionPlan | None:
@@ -149,6 +167,259 @@ class PostgresRepository:
         if row is None:
             return None
         return ActionPlan.model_validate(_decode_json(row["plan_json"]))
+
+    async def get_plan_state(self, plan_id: str):
+        from .models import PlanState, PlanExecutionResult
+
+        row = await self.pool.fetchrow(
+            """
+            SELECT plan_id, status, approved_by, approved_at, execution_result
+            FROM orion_plan_state
+            WHERE plan_id=$1
+            """,
+            plan_id,
+        )
+        if row is None:
+            return None
+        execution = _decode_json(row["execution_result"])
+        return PlanState(
+            plan_id=row["plan_id"],
+            status=row["status"],
+            approved_by=row["approved_by"],
+            approved_at=row["approved_at"],
+            execution_result=(
+                PlanExecutionResult.model_validate(execution)
+                if execution is not None
+                else None
+            ),
+        )
+
+    async def approve_plan(
+        self,
+        plan_id: str,
+        plan_hash: str,
+        actor_id: str,
+    ):
+        from .models import PlanState
+
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                plan = await connection.fetchrow(
+                    "SELECT incident_id, plan_hash FROM orion_plans WHERE plan_id=$1",
+                    plan_id,
+                )
+                if plan is None or plan["plan_hash"] != plan_hash:
+                    return None
+                state = await connection.fetchrow(
+                    """
+                    SELECT status, approval_hash, approved_by, approved_at
+                    FROM orion_plan_state
+                    WHERE plan_id=$1
+                    FOR UPDATE
+                    """,
+                    plan_id,
+                )
+                if state is None:
+                    return None
+                if state["status"] == "approved" and state["approval_hash"] == plan_hash:
+                    return PlanState(
+                        plan_id=plan_id,
+                        status="approved",
+                        approved_by=state["approved_by"],
+                        approved_at=state["approved_at"],
+                    )
+                if state["status"] != "pending_approval":
+                    return None
+
+                approved_at = await connection.fetchval(
+                    """
+                    UPDATE orion_plan_state
+                    SET status='approved', approval_hash=$2, approved_by=$3,
+                        approved_at=NOW(), updated_at=NOW()
+                    WHERE plan_id=$1 AND status='pending_approval'
+                    RETURNING approved_at
+                    """,
+                    plan_id,
+                    plan_hash,
+                    actor_id,
+                )
+                if approved_at is None:
+                    return None
+                await connection.execute(
+                    """
+                    INSERT INTO orion_audit_events(
+                        incident_id, plan_id, event_type, actor_id, details
+                    )
+                    VALUES($1, $2, 'plan_approved', $3, $4::jsonb)
+                    """,
+                    plan["incident_id"],
+                    plan_id,
+                    actor_id,
+                    json.dumps({"plan_hash": plan_hash}),
+                )
+                return PlanState(
+                    plan_id=plan_id,
+                    status="approved",
+                    approved_by=actor_id,
+                    approved_at=approved_at,
+                )
+
+    async def block_plan(
+        self,
+        plan_id: str,
+        actor_id: str | None,
+        reason: str,
+    ) -> bool:
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                row = await connection.fetchrow(
+                    """
+                    UPDATE orion_plan_state
+                    SET status='blocked', approval_hash=NULL,
+                        approved_by=NULL, approved_at=NULL, updated_at=NOW()
+                    WHERE plan_id=$1 AND status IN ('pending_approval', 'approved')
+                    RETURNING plan_id
+                    """,
+                    plan_id,
+                )
+                if row is None:
+                    return False
+                plan = await connection.fetchrow(
+                    "SELECT incident_id FROM orion_plans WHERE plan_id=$1",
+                    plan_id,
+                )
+                await connection.execute(
+                    """
+                    INSERT INTO orion_audit_events(
+                        incident_id, plan_id, event_type, actor_id, details
+                    )
+                    VALUES($1, $2, 'plan_blocked', $3, $4::jsonb)
+                    """,
+                    plan["incident_id"],
+                    plan_id,
+                    actor_id,
+                    json.dumps({"reason": reason}),
+                )
+                return True
+
+    async def claim_execution(self, plan_id: str):
+        from .models import PlanExecutionResult, PlanState
+
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                row = await connection.fetchrow(
+                    """
+                    SELECT s.status, s.approval_hash, s.approved_by,
+                           s.approved_at, s.execution_result, p.plan_hash,
+                           p.incident_id
+                    FROM orion_plan_state AS s
+                    JOIN orion_plans AS p ON p.plan_id=s.plan_id
+                    WHERE s.plan_id=$1
+                    FOR UPDATE OF s
+                    """,
+                    plan_id,
+                )
+                if row is None:
+                    return None
+                if row["status"] in {
+                    "succeeded",
+                    "canary_failed",
+                    "rolled_back",
+                    "rollback_failed",
+                    "cleanup_failed",
+                    "failed",
+                }:
+                    result = _decode_json(row["execution_result"])
+                    return PlanState(
+                        plan_id=plan_id,
+                        status=row["status"],
+                        approved_by=row["approved_by"],
+                        approved_at=row["approved_at"],
+                        execution_result=(
+                            PlanExecutionResult.model_validate(result)
+                            if result is not None
+                            else None
+                        ),
+                    )
+                if (
+                    row["status"] != "approved"
+                    or row["approval_hash"] != row["plan_hash"]
+                ):
+                    return None
+                await connection.execute(
+                    """
+                    UPDATE orion_plan_state
+                    SET status='executing', updated_at=NOW()
+                    WHERE plan_id=$1
+                    """,
+                    plan_id,
+                )
+                await connection.execute(
+                    """
+                    INSERT INTO orion_audit_events(
+                        incident_id, plan_id, event_type, actor_id, details
+                    )
+                    VALUES($1, $2, 'canary_execution_started', $3, $4::jsonb)
+                    """,
+                    row["incident_id"],
+                    plan_id,
+                    row["approved_by"],
+                    json.dumps({"plan_hash": row["plan_hash"]}),
+                )
+                return PlanState(
+                    plan_id=plan_id,
+                    status="executing",
+                    approved_by=row["approved_by"],
+                    approved_at=row["approved_at"],
+                )
+
+    async def complete_execution(
+        self,
+        plan_id: str,
+        status: str,
+        result: dict,
+        actor_id: str | None,
+    ):
+        from .models import PlanExecutionResult, PlanState
+
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                row = await connection.fetchrow(
+                    """
+                    UPDATE orion_plan_state
+                    SET status=$2, execution_result=$3::jsonb, updated_at=NOW()
+                    WHERE plan_id=$1 AND status='executing'
+                    RETURNING approved_by, approved_at
+                    """,
+                    plan_id,
+                    status,
+                    json.dumps(result),
+                )
+                if row is None:
+                    return None
+                plan = await connection.fetchrow(
+                    "SELECT incident_id FROM orion_plans WHERE plan_id=$1",
+                    plan_id,
+                )
+                await connection.execute(
+                    """
+                    INSERT INTO orion_audit_events(
+                        incident_id, plan_id, event_type, actor_id, details
+                    )
+                    VALUES($1, $2, 'canary_execution_completed', $3, $4::jsonb)
+                    """,
+                    plan["incident_id"],
+                    plan_id,
+                    actor_id,
+                    json.dumps(result),
+                )
+                return PlanState(
+                    plan_id=plan_id,
+                    status=status,
+                    approved_by=row["approved_by"],
+                    approved_at=row["approved_at"],
+                    execution_result=PlanExecutionResult.model_validate(result),
+                )
 
     async def record_dry_run(
         self,

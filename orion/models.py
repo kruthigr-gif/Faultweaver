@@ -71,7 +71,7 @@ class IncidentRecord(BaseModel):
 
 
 class PlanTarget(BaseModel):
-    cluster: Literal["sentinelsre-local"]
+    cluster: Literal["sentinelsre-local", "sentinelsre-staging"]
     namespace: Literal["sre-staging"]
     deployment: str
     service: ServiceName
@@ -84,8 +84,8 @@ class PolicyCheck(BaseModel):
 
 
 class PolicyDecision(BaseModel):
-    decision: Literal["no_action", "blocked"]
-    execution_enabled: Literal[False] = False
+    decision: Literal["no_action", "blocked", "approval_required"]
+    execution_enabled: bool = False
     checks: list[PolicyCheck]
     reasons: list[str]
 
@@ -109,12 +109,63 @@ class ActionPlan(PlanProposal):
 
 class DryRunResult(BaseModel):
     plan_id: str
-    decision: Literal["no_action", "blocked"]
+    decision: Literal["no_action", "blocked", "approval_required"]
     executed: Literal[False] = False
     would_mutate_cluster: Literal[False] = False
     checks: list[PolicyCheck]
     reasons: list[str]
     message: str
+
+
+class PlanApprovalRequest(BaseModel):
+    plan_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class PlanApproval(BaseModel):
+    plan_id: str
+    plan_hash: str
+    approved: Literal[True] = True
+    approved_by: str
+    approved_at: datetime
+
+
+class PlanExecutionResult(BaseModel):
+    plan_id: str
+    status: Literal[
+        "succeeded",
+        "canary_failed",
+        "rolled_back",
+        "rollback_failed",
+        "cleanup_failed",
+        "failed",
+    ]
+    executed: Literal[True] = True
+    canary_ready: bool
+    rollout_succeeded: bool
+    rollback_performed: bool
+    rollback_succeeded: bool
+    cleanup_succeeded: bool
+    message: str
+
+
+class PlanState(BaseModel):
+    plan_id: str
+    status: Literal[
+        "blocked",
+        "no_action",
+        "pending_approval",
+        "approved",
+        "executing",
+        "succeeded",
+        "canary_failed",
+        "rolled_back",
+        "rollback_failed",
+        "cleanup_failed",
+        "failed",
+    ]
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    execution_result: PlanExecutionResult | None = None
 
 
 class AuditEvent(BaseModel):

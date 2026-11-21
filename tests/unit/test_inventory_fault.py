@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from pathlib import Path
 
@@ -22,3 +23,27 @@ def test_injected_inventory_error_fails_order_reservation(monkeypatch):
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Injected fault"
+
+
+def test_injected_latency_delays_order_reservation(monkeypatch):
+    delays = []
+    initial_stock = inventory_app.STOCK_DB["itemA"]
+
+    async def record_sleep(seconds):
+        delays.append(seconds)
+
+    monkeypatch.setattr(inventory_app, "LATENCY_MS", 1500)
+    monkeypatch.setattr(inventory_app.asyncio, "sleep", record_sleep)
+
+    try:
+        asyncio.run(
+            inventory_app.reserve_stock(
+                item_id="itemA",
+                quantity=1,
+                _user={"sub": "local-test"},
+            )
+        )
+    finally:
+        inventory_app.STOCK_DB["itemA"] = initial_stock
+
+    assert delays == [1.5]

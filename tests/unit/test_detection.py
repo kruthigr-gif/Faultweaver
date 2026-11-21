@@ -31,7 +31,7 @@ def test_detector_anomaly_false():
     detector = Detector(mock)
     assert not detector.is_anomaly("order-service", "2023-01-01T00:02:00Z")
     assert mock.queries[0].startswith("sum(rate(http_request_duration_seconds_sum")
-    assert 'job="order-service",handler="/orders"' in mock.queries[0]
+    assert 'job="order-service",handler=~"/orders"' in mock.queries[0]
 
 
 def test_detector_reports_insufficient_data_without_baseline():
@@ -42,6 +42,16 @@ def test_detector_reports_insufficient_data_without_baseline():
 
     assert assessment["status"] == "insufficient_data"
     assert assessment["current_latency_seconds"] is None
+
+
+def test_inventory_detector_includes_order_reservation_and_stock_requests():
+    response = {"data": {"result": [{"value": [0, "0.1"]}]}}
+    mock = MockTelemetry(response, response)
+    detector = Detector(mock)
+
+    detector.assess("inventory-service", "2023-01-01T00:02:00Z")
+
+    assert 'job="inventory-service",handler=~"/(stock|reserve)"' in mock.queries[0]
 
 
 def test_detector_rejects_unknown_service():

@@ -7,6 +7,9 @@ scenarios:
     latency_ms: 2000
     expected_symptom: elevated_order_latency
     expected_root_cause: inventory-service
+    expected_latency_anomaly: true
+    expect_error_evidence: false
+    measure_recovery: false
   - scenario_id: inventory_error_01
     fault_type: error_response
     fault_service: inventory-service
@@ -15,3 +18,18 @@ scenarios:
     error_code: 500
     expected_symptom: elevated_order_error_rate
     expected_root_cause: inventory-service
+    expected_latency_anomaly: false
+    expect_error_evidence: true
+    measure_recovery: true
+  - scenario_id: inventory_combined_01
+    fault_type: combined_latency_error
+    fault_service: inventory-service
+    start_offset_seconds: 30
+    duration_seconds: 60
+    latency_ms: 1500
+    error_code: 500
+    expected_symptom: elevated_latency_and_error_rate
+    expected_root_cause: inventory-service
+    expected_latency_anomaly: true
+    expect_error_evidence: true
+    measure_recovery: true

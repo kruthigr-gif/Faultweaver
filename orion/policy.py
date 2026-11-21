@@ -1,9 +1,19 @@
 from datetime import datetime, timezone
 
 from .models import IncidentRecord, PlanProposal, PolicyCheck, PolicyDecision
+from .staging_config import (
+    STAGING_CLUSTER_NAME,
+    STAGING_DEPLOYMENTS,
+    STAGING_NAMESPACE,
+)
 
 
-def evaluate_plan(incident: IncidentRecord, plan: PlanProposal) -> PolicyDecision:
+def evaluate_plan(
+    incident: IncidentRecord,
+    plan: PlanProposal,
+    staging_validation: PolicyCheck | None = None,
+    executor_enabled: bool = False,
+) -> PolicyDecision:
     if plan.action == "investigate_only":
         return PolicyDecision(
             decision="no_action",
@@ -42,38 +52,48 @@ def evaluate_plan(incident: IncidentRecord, plan: PlanProposal) -> PolicyDecisio
             name="fixed_target",
             passed=(
                 plan.target is not None
-                and plan.target.cluster == "sentinelsre-local"
-                and plan.target.namespace == "sre-staging"
-                and plan.target.service in {
-                    "order-service",
-                    "inventory-service",
-                    "payment-service",
-                }
+                and plan.target.cluster == STAGING_CLUSTER_NAME
+                and plan.target.namespace == STAGING_NAMESPACE
+                and STAGING_DEPLOYMENTS.get(plan.target.service)
+                == plan.target.deployment
             ),
-            detail="Target must match the fixed local cluster and staging namespace.",
+            detail="Target must match the fixed local inventory deployment and staging namespace.",
         ),
         PolicyCheck(
             name="fresh_evidence",
             passed=evidence_is_fresh,
             detail="Investigation evidence must be no more than five minutes old.",
         ),
-        PolicyCheck(
+        staging_validation
+        or PolicyCheck(
             name="staging_validation",
             passed=False,
-            detail="Kubernetes staging validation is not implemented in this release.",
+            detail="No isolated Kubernetes staging validation is configured.",
         ),
         PolicyCheck(
             name="executor",
-            passed=False,
-            detail="No Kubernetes executor is configured; mutations are disabled.",
+            passed=executor_enabled,
+            detail=(
+                "The isolated staging executor is configured; explicit approval is still required."
+                if executor_enabled
+                else "No Kubernetes executor is configured; mutations are disabled."
+            ),
         ),
     ]
     failed = [check.name for check in checks if not check.passed]
     return PolicyDecision(
-        decision="blocked",
+        decision="approval_required" if not failed else "blocked",
         checks=checks,
         reasons=[
-            "Mutating actions are unavailable in this observe-and-dry-run release.",
-            "Failed checks: " + ", ".join(failed),
+            (
+                "All automatic checks passed; explicit human approval is required."
+                if not failed
+                else "The mutating action is blocked by policy."
+            ),
+            *(
+                ["Failed checks: " + ", ".join(failed)]
+                if failed
+                else []
+            ),
         ],
     )

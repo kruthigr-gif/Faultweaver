@@ -183,6 +183,7 @@ services:
       - OIDC_AUDIENCE=sre-api
       - OIDC_JWKS_URL=http://keycloak:8080/realms/sre-local/protocol/openid-connect/certs
       - OIDC_ALGORITHM=RS256
+      - ORION_EXECUTION_ENABLED=false
     depends_on:
       postgres:
         condition: service_healthy

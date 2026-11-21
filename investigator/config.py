@@ -9,6 +9,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://o
 
 SERVICE_HANDLERS = {
     "order-service": "/orders",
-    "inventory-service": "/stock",
+    "inventory-service": "/(stock|reserve)",
     "payment-service": "/pay",
 }

@@ -4,13 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .models import IncidentRecord, PlanProposal, PlanTarget
-
-
-DEPLOYMENTS = {
-    "order-service": "order-service",
-    "inventory-service": "inventory-service",
-    "payment-service": "payment-service",
-}
+from .staging_config import STAGING_CLUSTER_NAME, STAGING_DEPLOYMENTS, STAGING_NAMESPACE
 
 
 def _has_corroborating_error_evidence(
@@ -59,6 +53,7 @@ def propose_plan(incident: IncidentRecord) -> PlanProposal:
     can_propose_restart = (
         incident.investigation.detection.status == "anomaly"
         and lead is not None
+        and candidate_service in STAGING_DEPLOYMENTS
         and lead.confidence == "high"
         and corroborated_error
     )
@@ -75,9 +70,9 @@ def propose_plan(incident: IncidentRecord) -> PlanProposal:
     else:
         action = "restart_deployment"
         target = PlanTarget(
-            cluster="sentinelsre-local",
-            namespace="sre-staging",
-            deployment=DEPLOYMENTS[candidate_service],
+            cluster=STAGING_CLUSTER_NAME,
+            namespace=STAGING_NAMESPACE,
+            deployment=STAGING_DEPLOYMENTS[candidate_service],
             service=candidate_service,
         )
         rationale = (

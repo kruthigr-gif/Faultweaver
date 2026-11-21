@@ -26,9 +26,9 @@ class Detector:
 
         query = (
             "sum(rate(http_request_duration_seconds_sum"
-            f'{{job="{service}",handler="{handler}"}}[{window_seconds}s])) / '
+            f'{{job="{service}",handler=~"{handler}"}}[{window_seconds}s])) / '
             "sum(rate(http_request_duration_seconds_count"
-            f'{{job="{service}",handler="{handler}"}}[{window_seconds}s]))'
+            f'{{job="{service}",handler=~"{handler}"}}[{window_seconds}s]))'
         )
         result = self.telemetry.query_prometheus(query, time=str(int(end_ts)))
         values = result.get("data", {}).get("result", [])

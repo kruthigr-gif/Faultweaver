@@ -41,3 +41,23 @@ def test_error_scenario_applies_and_clears_fault(monkeypatch):
         ("inventory-service", 0, 500),
         ("inventory-service", 0, None),
     ]
+
+
+def test_combined_scenario_applies_both_faults_and_clears_them(monkeypatch):
+    compose_calls = []
+    monkeypatch.setattr(
+        inject,
+        "run_compose",
+        lambda service, latency, error: compose_calls.append(
+            (service, latency, error)
+        ),
+    )
+    monkeypatch.setattr(inject.time, "sleep", lambda _: None)
+    monkeypatch.setattr(inject, "wait_for_service", lambda: None)
+
+    inject.inject_fault("inventory_combined_01")
+
+    assert compose_calls == [
+        ("inventory-service", 1500, 500),
+        ("inventory-service", 0, None),
+    ]

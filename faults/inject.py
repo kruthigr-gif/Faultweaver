@@ -70,6 +70,9 @@ def inject_fault(scenario_id):
         latency_ms = int(scenario.get("latency_ms", 1000))
     elif fault_type == "error_response":
         error_code = int(scenario.get("error_code", 500))
+    elif fault_type == "combined_latency_error":
+        latency_ms = int(scenario.get("latency_ms", 1000))
+        error_code = int(scenario.get("error_code", 500))
     else:
         raise ValueError(f"Unsupported fault type: {fault_type}")
 

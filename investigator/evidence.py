@@ -104,7 +104,7 @@ class EvidenceCollector:
 
         error_query = (
             "sum(increase(http_requests_total"
-            f'{{job="{service}",handler="{handler}",status=~"4xx|5xx"}}'
+            f'{{job="{service}",handler=~"{handler}",status=~"4xx|5xx"}}'
             f'[{window_seconds}s])) or vector(0)'
         )
         try:

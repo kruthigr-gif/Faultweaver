@@ -56,3 +56,29 @@ def test_diagnoser_ranks_correlated_error_signals_first():
         "inventory-latency",
         "inventory-errors",
     ]
+
+
+def test_unavailable_evidence_cannot_raise_a_service_rank():
+    ranked = Diagnoser().rank(
+        "order-service",
+        [
+            {
+                "evidence_id": "unavailable-errors",
+                "service": "inventory-service",
+                "signal": "errors",
+                "score": 5,
+                "available": False,
+            },
+            {
+                "evidence_id": "available-latency",
+                "service": "order-service",
+                "signal": "latency",
+                "score": 0,
+                "available": True,
+            },
+        ],
+    )
+
+    assert ranked[0]["service"] == "order-service"
+    assert ranked[0]["confidence"] == "low"
+    assert ranked[0]["evidence_ids"] == ["available-latency"]

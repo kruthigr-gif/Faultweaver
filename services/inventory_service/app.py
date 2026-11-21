@@ -84,15 +84,18 @@ def raise_injected_error(item_id: str):
         )
 
 
+async def _apply_injected_latency():
+    if LATENCY_MS > 0:
+        await asyncio.sleep(LATENCY_MS / 1000.0)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
 @app.get("/stock")
 async def get_stock(item_id: str, _user=Depends(require_user)):
-    # Inject artificial latency if configured
-    if LATENCY_MS > 0:
-        await asyncio.sleep(LATENCY_MS / 1000.0)
+    await _apply_injected_latency()
     # Inject forced HTTP error response if configured
     raise_injected_error(item_id)
     pool = getattr(app.state, "db", None)
@@ -118,6 +121,7 @@ async def get_stock(item_id: str, _user=Depends(require_user)):
 async def reserve_stock(item_id: str, quantity: int, _user=Depends(require_user)):
     if quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be positive")
+    await _apply_injected_latency()
     raise_injected_error(item_id)
 
     pool = getattr(app.state, "db", None)
