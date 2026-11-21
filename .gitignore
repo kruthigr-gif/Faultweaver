@@ -1,0 +1,38 @@
+# .gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+.env.example
+.venv/
+venv/
+ENV/
+env/
+instance/
+*.egg-info/
+*.egg
+build/
+.dist/
+*.log
+*.sqlite3
+*.db
+.DS_Store
+.idea/
+.vscode/
+.pytest_cache/
+# Docker artifacts
+docker-compose.override.yml
+# Local telemetry data
+prometheus_data/
+loki_data/
+tempo_data/
+# Test artifacts
+tests/__pycache__/
+backups/
+# Do not publish local screenshots except the dashboard used in README.
+Screenshots/*
+!Screenshots/Screenshot 2026-11-21 093417.png
+# This optional Kubernetes template contains credential placeholders.
+k8s/base/secret.example.yaml

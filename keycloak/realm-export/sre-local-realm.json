@@ -1,0 +1,42 @@
+{
+  "realm": "sre-local",
+  "enabled": true,
+  "displayName": "Local SRE Demo",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "clients": [
+    {
+      "clientId": "sre-api",
+      "name": "Local SRE API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8000/*",
+        "http://localhost:9000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8000",
+        "http://localhost:9000"
+      ],
+      "protocolMappers": [
+        {
+          "name": "sre-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "sre-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

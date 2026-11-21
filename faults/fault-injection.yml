@@ -1,0 +1,5 @@
+services:
+  inventory-service:
+    environment:
+      LATENCY_MS: ${LATENCY_MS:-0}
+      FORCE_ERROR: ${FORCE_ERROR:-}

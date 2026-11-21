@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-config
+  namespace: sre
+data:
+  AUTH_ENABLED: "true"
+  OIDC_ALGORITHM: "RS256"
+  OIDC_AUDIENCE: "sre-api"
+  PAYMENT_PROVIDER_MODE: "live"
+  PAYMENT_CURRENCY: "USD"

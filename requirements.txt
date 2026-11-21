@@ -1,0 +1,18 @@
+# Updated requirements with Prometheus instrumentation
+fastapi
+uvicorn[standard]
+httpx
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-httpx
+opentelemetry-exporter-otlp
+pandas
+numpy
+scikit-learn
+prometheus-api-client
+requests
+prometheus_fastapi_instrumentator
+PyYAML
+pytest
+python-jose[cryptography]
+asyncpg

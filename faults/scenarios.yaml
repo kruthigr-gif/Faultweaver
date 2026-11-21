@@ -1,0 +1,17 @@
+scenarios:
+  - scenario_id: inventory_latency_01
+    fault_type: downstream_latency
+    fault_service: inventory-service
+    start_offset_seconds: 30
+    duration_seconds: 60
+    latency_ms: 2000
+    expected_symptom: elevated_order_latency
+    expected_root_cause: inventory-service
+  - scenario_id: inventory_error_01
+    fault_type: error_response
+    fault_service: inventory-service
+    start_offset_seconds: 30
+    duration_seconds: 60
+    error_code: 500
+    expected_symptom: elevated_order_error_rate
+    expected_root_cause: inventory-service
