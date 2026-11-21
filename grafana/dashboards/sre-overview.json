@@ -104,7 +104,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (job) (rate(http_requests_total{status=\"5xx\"}[5m])) or on (job) (max by (job) (up{job=~\"order-service|inventory-service|payment-service\"}) * 0)",
+          "expr": "sum by (job) (rate(http_requests_total{status=\"5xx\"}[5m])) or on (job) (max by (job) (up{job=~\"order-service|inventory-service|payment-service|orion-service\"}) * 0)",
           "legendFormat": "{{job}}",
           "refId": "A"
         }
@@ -178,7 +178,7 @@
       },
       "targets": [
         {
-          "expr": "{service_name=~\"order-service|inventory-service|payment-service\"} | severity_text=~\"ERROR|FATAL\"",
+          "expr": "{service_name=~\"order-service|inventory-service|payment-service|orion-service\"} | severity_text=~\"ERROR|FATAL\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -208,7 +208,7 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({service_name=~\"order-service|inventory-service|payment-service\"} | severity_text=~\"ERROR|FATAL\" [5m])) or vector(0)",
+          "expr": "sum(count_over_time({service_name=~\"order-service|inventory-service|payment-service|orion-service\"} | severity_text=~\"ERROR|FATAL\" [5m])) or vector(0)",
           "queryType": "instant",
           "refId": "A"
         }

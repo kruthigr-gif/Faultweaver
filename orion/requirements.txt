@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+asyncpg
+httpx
+python-jose[cryptography]
+prometheus_fastapi_instrumentator
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-httpx
+opentelemetry-exporter-otlp

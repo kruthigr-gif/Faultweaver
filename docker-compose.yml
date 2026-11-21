@@ -167,6 +167,43 @@ services:
       - keycloak
     restart: unless-stopped
 
+  orion-service:
+    build:
+      context: .
+      dockerfile: orion/Dockerfile
+    container_name: orion-service
+    ports:
+      - "127.0.0.1:9100:8000"
+    environment:
+      - DATABASE_URL=postgresql://sre:${POSTGRES_PASSWORD:?Run scripts/start_local.py first}@postgres:5432/sre
+      - INVESTIGATOR_URL=http://investigator:80
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - AUTH_ENABLED=true
+      - OIDC_ISSUER=http://localhost:8081/realms/sre-local
+      - OIDC_AUDIENCE=sre-api
+      - OIDC_JWKS_URL=http://keycloak:8080/realms/sre-local/protocol/openid-connect/certs
+      - OIDC_ALGORITHM=RS256
+    depends_on:
+      postgres:
+        condition: service_healthy
+      investigator:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read()"
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: sre-postgres

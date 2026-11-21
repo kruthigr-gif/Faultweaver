@@ -25,6 +25,7 @@ Detection approach: The current implementation uses a statistical latency-baseli
 * ?? Automated Testing: Includes unit and integration tests using Pytest.
 * ?? Containerized Environment: Runs the complete application and observability stack through Docker Compose.
 * ?? Local-First Deployment: No paid SaaS monitoring platform or external payment provider required.
+* ORION observe-and-dry-run control plane for persisted incidents, deterministic action proposals, policy decisions, and audit events. It cannot execute repairs.
 
 ??? Architecture
 SentinelSRE follows a distributed microservices architecture with a centralized observability and investigation layer.
@@ -49,9 +50,11 @@ flowchart TB
     end
 
     Investigator["SentinelSRE<br/>Incident Investigator API"]
+    Orion["ORION<br/>Incident Control Plane"]
 
     User --> Auth
     User --> Order
+    User --> Orion
     Order --> Inventory
     Order --> Payment
     Order --> DB
@@ -75,6 +78,8 @@ flowchart TB
     Prom --> Investigator
     Loki --> Investigator
     Tempo --> Investigator
+    Orion --> Investigator
+    Orion --> DB
 Application Workflow
 1. The user authenticates through Keycloak.
 2. An authenticated order request reaches the Order Service.
@@ -86,6 +91,7 @@ Application Workflow
 8. Loki and Tempo store logs and traces respectively.
 9. Grafana visualizes the collected telemetry.
 10. The SentinelSRE Investigator API analyzes the telemetry and generates an incident report.
+11. ORION can persist an investigation and return a policy-evaluated dry-run plan; it does not apply changes.
 
 ??? Technology Stack
 CategoryTechnologiesPurposeBackendPython, FastAPIMicroservices and REST APIsContainerizationDocker, Docker ComposeService orchestrationDatabasePostgreSQLPersistent application storageAuthenticationKeycloak, OIDCIdentity and access managementMetricsPrometheusMetrics collection and queryingTelemetryOpenTelemetry CollectorTelemetry ingestionLoggingGrafana LokiCentralized log storageDistributed TracingGrafana TempoTrace storageVisualizationGrafanaObservability dashboardsTestingPytestUnit and integration testingTraffic GenerationPythonAutomated order requestsFault InjectionPythonControlled failure scenarios
@@ -121,6 +127,25 @@ Detection Status
 StatusMeaningnormalNo latency anomaly identifiedanomalyAbnormal latency detected against the baselineinsufficient_dataNot enough historical telemetry to establish a reliable baselineThe system explicitly reports insufficient data rather than making unsupported diagnoses.
 The investigator provides diagnostic recommendations but does not automatically remediate services.
 
+## ORION: Observe-and-Dry-Run Control Plane
+
+ORION is the first integration layer above the existing SentinelSRE investigator. It forwards an authenticated incident request to the Investigator, validates and stores the resulting report in PostgreSQL, deduplicates repeated alerts, and records an audit timeline. A deterministic planner can create an action proposal only when it sees a high-confidence lead with corroborating HTTP-error and error-log evidence. Latency by itself never triggers a restart proposal.
+
+The policy gate is deliberately fail-closed. Proposed restarts are blocked because this release does not yet include Kubernetes staging validation or an executor. The dry-run endpoint records its result but never connects to a cluster or changes a service. There are no approval or execution endpoints.
+
+After starting the Docker Compose stack, open the authenticated ORION API documentation at http://localhost:9100/docs.
+
+Implemented endpoints:
+
+* `POST /orion/incidents` - investigate, normalize, deduplicate, and persist an incident.
+* `GET /orion/incidents/{incident_id}` - retrieve the incident and investigation report.
+* `GET /orion/incidents/{incident_id}/audit` - view recorded lifecycle events.
+* `POST /orion/incidents/{incident_id}/plans` - create a deterministic plan and policy decision.
+* `GET /orion/plans/{plan_id}` - retrieve a stored plan.
+* `POST /orion/plans/{plan_id}/dry-run` - record a non-mutating dry-run result.
+
+Kubernetes validation, human approval, canary execution, monitoring, and rollback remain future work; ORION must not be described as autonomous remediation until those paths are implemented and tested.
+
 ? Fault Injection & Failure Simulation
 SentinelSRE includes a controlled fault injection mechanism to simulate service failures and observe their impact across the distributed application.
 Available Fault Scenarios
@@ -143,8 +168,8 @@ Ensure the following are installed:
 * PowerShell (for the commands below).
 * Internet connection for downloading container images.
 1. Clone the Repository
-git clone https://github.com/kruthigr-gif/SentinelSRE.git
-cd SentinelSRE
+git clone https://github.com/kruthigr-gif/SentinelSRE-Predictive-SRE-Incident-Investigator.git
+cd SentinelSRE-Predictive-SRE-Incident-Investigator
 Replace the repository URL and folder name if you choose a different GitHub repository name.
 2. Create a Virtual Environment
 python -m venv .venv
@@ -261,6 +286,9 @@ SentinelSRE/
 ?
 ??? investigator/    # Detection, evidence collection,
 ?                    # diagnosis, and investigation API
+?
+??? orion/           # Incident persistence, planning,
+?                    # policy checks, and dry-run API
 ?
 ??? keycloak/        # Local OIDC realm configuration
 ?
