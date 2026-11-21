@@ -33,6 +33,9 @@ tests/__pycache__/
 backups/
 # Do not publish local screenshots except the dashboard used in README.
 Screenshots/*
-!Screenshots/Screenshot 2026-11-21 093417.png
+!Screenshots/Screenshot 2026-11-21 124343.png
+!Screenshots/Screenshot 2026-11-21 125934.png
+!Screenshots/Screenshot 2026-11-21 125950.png
+!Screenshots/Screenshot 2026-11-21 143613.png
 # This optional Kubernetes template contains credential placeholders.
 k8s/base/secret.example.yaml
