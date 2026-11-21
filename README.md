@@ -248,29 +248,29 @@ The simulated e-commerce application contains:
 
 ## 📸 Dashboard Screenshots
 
-### 01. System Observability Dashboard
+### 01. Service Overview Dashboard
 
-An overview of the distributed application, displaying service health, performance metrics, request activity, and system behavior.
+Grafana shows service health, request rates, HTTP 5xx responses, and average request latency across the distributed application.
 
-![Faultweaver Observability Dashboard](screenshots/01-observability-dashboard.png)
+![SentinelSRE Service Overview Dashboard](Screenshots/Screenshot%202026-11-21%20125934.png)
 
-### 02. Live Metrics & Performance Monitoring
+### 02. HTTP 5xx Responses and Average Latency
 
-Real-time monitoring of application measurements, including latency, request activity, and service-level performance.
+The dashboard highlights service errors and latency changes while fault activity is visible.
 
-![Faultweaver Live Metrics](screenshots/02-live-metrics.png)
+![SentinelSRE HTTP Errors and Latency](Screenshots/Screenshot%202026-11-21%20125950.png)
 
-### 03. Inventory Service — Injected Error Logs
+### 03. Inventory Service Injected Error Logs
 
-Demonstrates controlled fault injection and the resulting service-level error logs. The logs capture injected inventory failures, providing evidence for downstream incident investigation.
+This view shows injected inventory errors captured by Grafana from Loki.
 
-![Faultweaver Inventory Error Logs](screenshots/03-inventory-error-logs.png)
+![SentinelSRE Inventory Error Logs](Screenshots/Screenshot%202026-11-21%20124343.png)
 
-### 04. ORION — Incident Investigation & Recovery
+### 04. Distributed Trace and Error Count
 
-Displays the structured incident investigation, evidence-ranked service leads, ORION lifecycle events, and remediation validation workflow.
+The Grafana panel shows an order-service trace and the number of service error-log entries in the selected time range.
 
-![Faultweaver ORION Investigation](screenshots/04-orion-investigation.png)
+![SentinelSRE Trace and Error Count](Screenshots/Screenshot%202026-11-21%20143613.png)
 
 ---
 
